@@ -13,22 +13,44 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum OrderStatus {
+  pending
+  paid
+  cancelled
+}
+
+enum PaymentMethod {
+  cash
+  qris
+}
+
+enum DeliveryMethod {
+  pickup
+  delivery
+}
+
+enum ItemType {
+  mentah
+  matang
+}
+
 model User {
-  id       Int      @id @default(autoincrement())
-  name     String
-  email    String   @unique
-  password String?
-  role     String   @default("customer") // admin / customer
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String?
+  phone     String?
+  role      String   @default("customer") // admin / customer
   createdAt DateTime @default(now())
+  orders    Order[]
 }
 
 model Product {
-  id        Int      @id @default(autoincrement())
-  name      String
-  price     Int
-  image     String?
+  id    Int    @id @default(autoincrement())
+  name  String
+  price Int
 
-  stock     Int      @default(0)
+  stock Int @default(0)
 
   createdAt DateTime @default(now())
 
@@ -36,28 +58,60 @@ model Product {
 }
 
 model Order {
-  id        Int      @id @default(autoincrement())
-  userId    Int?
-  total     Int
-  status    String   @default("pending") // pending / completed / cancelled
-  
-  paymentMethod String @default("cash") // cash / qris
-  paidAt   DateTime?
+  id Int @id @default(autoincrement())
 
-  paymentRef String? // for qris or cash note
+  userId Int?
+  User   User? @relation(fields: [userId], references: [id])
+
+  customerName  String
+  customerPhone String?
+
+  total Int
+
+  status         OrderStatus    @default(pending)
+  paymentMethod  PaymentMethod
+  deliveryMethod DeliveryMethod
+
+  address     String?
+  scheduledAt DateTime?
+  note        String?
+
+  paidAt DateTime?
 
   createdAt DateTime @default(now())
 
+  SubOrder SubOrder[]
   OrderItem OrderItem[]
+  @@index([createdAt])
+  @@index([status])
+}
+
+model SubOrder {
+  id      Int @id @default(autoincrement())
+  orderId Int
+
+  name String // "Budi", "Andi"
+  note String?
+
+  Order     Order       @relation(fields: [orderId], references: [id])
+  OrderItem OrderItem[]
+
+  createdAt DateTime @default(now())
 }
 
 model OrderItem {
-  id        Int @id @default(autoincrement())
-  orderId   Int
+  id         Int  @id @default(autoincrement())
+  orderId    Int
+  subOrderId Int?
+
   productId Int
   qty       Int
   price     Int
 
-  Order   Order   @relation(fields: [orderId], references: [id])
-  Product Product @relation(fields: [productId], references: [id])
+  type ItemType // mentah | matang
+  note String?
+
+  Order    Order     @relation(fields: [orderId], references: [id])
+  SubOrder SubOrder? @relation(fields: [subOrderId], references: [id])
+  Product  Product   @relation(fields: [productId], references: [id])
 }

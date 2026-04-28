@@ -1,56 +1,28 @@
 import * as orderService from '../services/order.service.js';
 import * as midtransService from '../services/midtrans.service.js';
 
-const createOrder = async (req, res) => {
-  // 
+export const createOrder = async (req, res) => {
   try {
-    const { items, user, paymentMethod } = req.body;
+    const result = await orderService.createOrder(
+      req.body,
+      req.user || null // 🔥 ambil dari middleware auth
+    );
 
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({
-        message: 'Items wajib diisi dan harus berupa array'
-      });
-    }
-
-    if (!paymentMethod) {
-      return res.status(400).json({
-        message: 'Payment method wajib diisi'
-      });
-    }
-
-    // 1. Buat order
-    const order = await orderService.createOrder(items, user?.id, paymentMethod);
-
-    // 2. generate pembayaran qris dengan midtrans
-    if (paymentMethod === 'qris') {
-      const transaction = await midtransService.createTransaction(order);
-      console.log(transaction);
-
-      return res.status(201).json({
-        message: 'Pesanan berhasil dibuat, silakan lanjutkan pembayaran',
-        data: {
-          orderId: order.id,
-          total: order.total,
-          paymentUrl: transaction.redirect_url,
-          token: transaction.token
-        }
-      });
-    } else {
-      return res.status(201).json({
-        message: 'Pesanan berhasil dibuat, silakan bayar di tempat',
-        data: {
-          orderId: order.id,
-          total: order.total
-        }
-      });
-    }
+    res.status(201).json({
+      success: true,
+      message:
+        result.paymentMethod === 'qris'
+          ? 'Pesanan dibuat, lanjutkan pembayaran'
+          : 'Pesanan berhasil (bayar di tempat)',
+      data: result
+    });
   } catch (err) {
-    res.status(500).json({
-      error: err.message
+    res.status(400).json({
+      success: false,
+      message: err.message
     });
   }
 };
-
 const getOrder = async (req, res) => {
   try {
     const { id } = req.params;

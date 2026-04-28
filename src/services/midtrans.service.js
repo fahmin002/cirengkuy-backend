@@ -6,11 +6,11 @@ const snap = new midtransClient.Snap({
     clientKey: process.env.MIDTRANS_CLIENT_KEY
 });
 
-export const createTransaction = async (order) => {
+export const createTransaction = async (order, total) => {
     const parameter = {
         "transaction_details": {
             "order_id": `CRK-${order.id}`,
-            "gross_amount": order.total
+            "gross_amount": total
         },
         enable_payments: ['qris'],
         callbacks: {
