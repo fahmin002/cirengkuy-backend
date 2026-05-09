@@ -1,0 +1,37 @@
+# Create 4 tunnels, each for different ports, with only https enabled
+# This way the ngrok process stays bellow the Free plan limit (4 tunnels)
+# command: ngrok start --all # to start all of them
+# command: ngrok start note tb # to run jupyter notebook server and tensorboard server only
+# refer to this page for more info: https://ngrok.com/docs#multiple-tunnels
+
+authtoken: 3CsWPXYwPldvkKIjNwIbkrCnxNQ_5d3NHQZLTiWwJDaFj8vcC
+log: ngrok.log
+tunnels:
+  # to run jupyter notebook server
+  # note:
+  #   addr: 7111
+  #   proto: http
+  #   bind_tls: true
+  # # to run visdom server
+  # visdom:
+  #   addr: 8097
+  #   proto: http
+  #   bind_tls: true
+  # # to run tensorboard server
+  # tb:
+  #   addr: 6006
+  #   proto: http
+  #   bind_tls: true
+  # # just an extra port available for any usage
+  # other:
+  #   addr: 6969
+  #   proto: http
+  #   bind_tls: true
+  vite:
+    addr: 5173
+    proto: http
+    bind_tls: true
+  express:
+    addr: 5000
+    proto: http
+    bind_tls: true

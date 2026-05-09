@@ -9,7 +9,7 @@ const snap = new midtransClient.Snap({
 export const createTransaction = async (order, total) => {
     const parameter = {
         "transaction_details": {
-            "order_id": `CRK-${order.id}`,
+            "order_id": `CRK-${order.code}`,
             "gross_amount": total
         },
         enable_payments: ['qris'],

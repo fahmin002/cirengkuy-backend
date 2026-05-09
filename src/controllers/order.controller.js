@@ -1,6 +1,6 @@
 import * as orderService from '../services/order.service.js';
 import * as midtransService from '../services/midtrans.service.js';
-
+import prisma from '../config/db.js';
 export const createOrder = async (req, res) => {
   try {
     const result = await orderService.createOrder(
@@ -34,7 +34,9 @@ const getOrder = async (req, res) => {
       });
     }
 
-    res.json(order);
+    res.json({
+      data: order
+    });
   } catch (err) {
     res.status(500).json({
       error: err.message
@@ -56,12 +58,30 @@ const getAllOrders = async (req, res) => {
 
 const updateOrderStatus = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id } = parseInt(req.params.id);
     const { status } = req.body;
 
-    if (!status) {
+    const allowed = ['pending', 'paid', 'cooking', 'ready', 'completed', 'cancelled'];
+    if (!allowed.includes(status)) {
       return res.status(400).json({
-        message: 'Status wajib diisi'
+        message: 'Status tidak valid'
+      });
+    }
+
+    // validasi transisi status
+    const current = await prisma.order.findUnique({ where: { id } });
+    const flow = {
+      pending: ['paid', 'cancelled'],
+      paid: ['cooking', 'cancelled'],
+      cooking: ['ready'],
+      ready: ['completed'],
+      completed: [],
+      cancelled: []
+    };
+
+    if (!flow[current.status].includes(status)) {
+      return res.status(400).json({
+        message: `Transisi status tidak valid dari ${current.status} ke ${status}`
       });
     }
 
@@ -78,9 +98,35 @@ const updateOrderStatus = async (req, res) => {
   }
 };
 
+const getOrderByQuery = async (req, res) => {
+  const { status, q } = req.query;
+
+  const where = {
+    ...(status ? { status } : {}),
+    ...(q ? {
+        OR: [
+          { customerName: { contains: q, mode: 'insensitive' } },
+          { customerPhone: { contains: q, mode: 'insensitive' } }
+        ]
+    } : {})
+  };
+
+  const orders = await prisma.order.findMany({
+    where,
+    include: {
+      OrderItem: { include: { Product: true } }
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 50
+  });
+
+  res.json({ data: orders });
+}
+
 export default {
   createOrder,
   getOrder,
   getAllOrders,
-  updateOrderStatus
+  updateOrderStatus,
+  getOrderByQuery
 };

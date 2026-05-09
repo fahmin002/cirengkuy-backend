@@ -7,10 +7,9 @@ router.post('/webhook', async (req, res) => {
     try {
         const { order_id, transaction_status } = req.body;
 
-        const orderId = parseInt(order_id.replace('CRK-', ''));
+        const orderId = order_id.replace('CRK-', '');
 
         let status = 'pending';
-
         if (transaction_status === 'settlement') {
             status = 'paid';
         } else if (transaction_status === 'expire') {

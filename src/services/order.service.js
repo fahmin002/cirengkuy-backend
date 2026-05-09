@@ -60,7 +60,7 @@ import { createTransaction } from './midtrans.service.js';
 
 //   return order;
 // };
-
+import { v4 as uuidv4 } from "uuid";
 /* ---------------------------
  * 1. VALIDATION
  * --------------------------- */
@@ -184,13 +184,13 @@ export const createOrder = async (payload, user = null) => {
 
   return await prisma.$transaction(async (tx) => {
     const { total, draftItems } = await prepareOrderData(tx, subOrders);
-
+    const orderCode = uuidv4();
     const order = await tx.order.create({
       data: {
         userId: payload.userId || null,
         customerName: payload.customerName,
         customerPhone: payload.customerPhone || null,
-
+        code: orderCode,
         total,
         status: payload.paymentMethod === 'cash' ? 'paid' : 'pending',
         paymentMethod: payload.paymentMethod,
@@ -299,9 +299,11 @@ export const getOrderSummary = async () => {
   };
 };
 
-export const updateOrderStatus = async (id, status) => {
+export const updateOrderStatus = async (code, status) => {
+  const paidAt = status === 'paid' ? new Date() : null;
+  console.log(paidAt);
   return await prisma.order.update({
-    where: { id: Number(id) },
-    data: { status, paidAt: status === 'paid' ? new Date() : null }
+    where: { code: code },
+    data: { status, paidAt }
   });
 };

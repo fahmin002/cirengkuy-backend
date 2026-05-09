@@ -16,6 +16,9 @@ datasource db {
 enum OrderStatus {
   pending
   paid
+  cooking
+  ready
+  completed
   cancelled
 }
 
@@ -59,6 +62,7 @@ model Product {
 
 model Order {
   id Int @id @default(autoincrement())
+  code String @unique
 
   userId Int?
   User   User? @relation(fields: [userId], references: [id])
