@@ -26,11 +26,12 @@ CREATE TABLE `Product` (
 -- CreateTable
 CREATE TABLE `Order` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `code` VARCHAR(191) NOT NULL,
     `userId` INTEGER NULL,
     `customerName` VARCHAR(191) NOT NULL,
     `customerPhone` VARCHAR(191) NULL,
     `total` INTEGER NOT NULL,
-    `status` ENUM('pending', 'paid', 'cancelled') NOT NULL DEFAULT 'pending',
+    `status` ENUM('pending', 'paid', 'cooking', 'ready', 'completed', 'cancelled') NOT NULL DEFAULT 'pending',
     `paymentMethod` ENUM('cash', 'qris') NOT NULL,
     `deliveryMethod` ENUM('pickup', 'delivery') NOT NULL,
     `address` VARCHAR(191) NULL,
@@ -39,6 +40,7 @@ CREATE TABLE `Order` (
     `paidAt` DATETIME(3) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
+    UNIQUE INDEX `Order_code_key`(`code`),
     INDEX `Order_createdAt_idx`(`createdAt`),
     INDEX `Order_status_idx`(`status`),
     PRIMARY KEY (`id`)

@@ -18,7 +18,7 @@ router.post('/webhook', async (req, res) => {
             status = 'cancelled';
         }
 
-        await orderService.updateOrderStatus(orderId, status);
+        await orderService.updatePaymentStatus(orderId, status);
 
         console.log(`Order ${orderId} status updated to ${status}`);
 

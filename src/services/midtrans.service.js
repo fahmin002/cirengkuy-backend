@@ -14,7 +14,7 @@ export const createTransaction = async (order, total) => {
         },
         enable_payments: ['qris'],
         callbacks: {
-            finish: `${process.env.FRONTEND_URL}/payment-success?orderId=${order.id}`,
+            finish: `${process.env.FRONTEND_URL}/payment-success?orderCode=${order.code}`,
         }
     };
 

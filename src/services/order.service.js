@@ -1,5 +1,5 @@
 import prisma from "../config/db.js";
-import { createTransaction } from './midtrans.service.js';
+import { createTransaction } from "./midtrans.service.js";
 // export const createOrder = async (items, userId = null, paymentMethod = 'cash') => {
 //   // 1. Ambil data produk berdasarkan productId dari items
 //   const productIds = items.map(item => item.productId);
@@ -65,21 +65,27 @@ import { v4 as uuidv4 } from "uuid";
  * 1. VALIDATION
  * --------------------------- */
 function validatePayload(payload) {
-  const { deliveryMethod, paymentMethod, address, customerName, customerPhone } = payload;
-  if (!['pickup', 'delivery'].includes(deliveryMethod)) {
-    throw new Error('deliveryMethod tidak valid');
+  const {
+    deliveryMethod,
+    paymentMethod,
+    address,
+    customerName,
+    customerPhone,
+  } = payload;
+  if (!["pickup", "delivery"].includes(deliveryMethod)) {
+    throw new Error("deliveryMethod tidak valid");
   }
 
-  if (!['cash', 'qris'].includes(paymentMethod)) {
-    throw new Error('paymentMethod tidak valid');
+  if (!["cash", "qris"].includes(paymentMethod)) {
+    throw new Error("paymentMethod tidak valid");
   }
 
-  if (deliveryMethod === 'delivery' && !address) {
-    throw new Error('address wajib untuk delivery');
+  if (deliveryMethod === "delivery" && !address) {
+    throw new Error("address wajib untuk delivery");
   }
 
   if (!customerName) {
-    throw new Error('customerName wajib diisi');
+    throw new Error("customerName wajib diisi");
   }
   // result
   // return true;
@@ -95,7 +101,7 @@ function normalizePayload(payload) {
   const hasItems = Array.isArray(items) && items.length > 0;
 
   if (!hasSubOrders && !hasItems) {
-    throw new Error('payload harus memiliki items atau subOrders');
+    throw new Error("payload harus memiliki items atau subOrders");
   }
 
   if (hasSubOrders) {
@@ -104,11 +110,13 @@ function normalizePayload(payload) {
 
   if (!hasSubOrders && hasItems) {
     // Wrap items ke dalam subOrder default
-    return [{
-      name: payload.customerName || 'Pesanan Utama',
-      note: null,
-      items
-    }];
+    return [
+      {
+        name: payload.customerName || "Pesanan Utama",
+        note: null,
+        items,
+      },
+    ];
   }
 }
 
@@ -118,30 +126,30 @@ function normalizePayload(payload) {
 async function prepareOrderData(tx, subOrders) {
   const ids = new Set();
 
-  subOrders.forEach(so => {
+  subOrders.forEach((so) => {
     if (!Array.isArray(so.items) || so.items.length === 0) {
-      throw new Error(`SubOrder ${so.name || '-'} tidak punya item`);
+      throw new Error(`SubOrder ${so.name || "-"} tidak punya item`);
     }
 
-    so.items.forEach(i => ids.add(i.productId));
+    so.items.forEach((i) => ids.add(i.productId));
   });
 
   const products = await tx.product.findMany({
-    where: { id: { in: [...ids] } }
-  })
+    where: { id: { in: [...ids] } },
+  });
 
-  const map = new Map(products.map(p => [p.id, p]));
+  const map = new Map(products.map((p) => [p.id, p]));
 
   let total = 0;
 
   const draftItems = [];
 
   subOrders.forEach((so, idx) => {
-    so.items.forEach(i => {
+    so.items.forEach((i) => {
       const product = map.get(i.productId);
 
       if (!product) throw new Error(`Produk ${i.productId} tidak ditemukan`);
-      if (i.qty <= 0) throw new Error('Qty tidak valid');
+      if (i.qty <= 0) throw new Error("Qty tidak valid");
       if (product.stock < i.qty) {
         throw new Error(`Stok tidak cukup untuk ${product.name}`);
       }
@@ -153,15 +161,15 @@ async function prepareOrderData(tx, subOrders) {
         productId: product.id,
         qty: i.qty,
         price: price,
-        type: i.type || 'matang',
+        type: i.type || "matang",
         note: i.note || null,
-        subIdx: idx
+        subIdx: idx,
       });
     });
   });
 
   if (total <= 0) {
-    throw new Error('Total order tidak boleh 0');
+    throw new Error("Total order tidak boleh 0");
   }
 
   return { total, draftItems };
@@ -192,16 +200,16 @@ export const createOrder = async (payload, user = null) => {
         customerPhone: payload.customerPhone || null,
         code: orderCode,
         total,
-        status: payload.paymentMethod === 'cash' ? 'paid' : 'pending',
+        status: payload.paymentMethod === "cash" ? "paid" : "pending",
         paymentMethod: payload.paymentMethod,
         deliveryMethod: payload.deliveryMethod,
 
-        address: payload.deliveryMethod === 'delivery' ? payload.address : null,
+        address: payload.deliveryMethod === "delivery" ? payload.address : null,
         scheduledAt: payload.scheduledAt ? new Date(payload.scheduledAt) : null,
         note: payload.note || null,
 
-        paidAt: payload.paymentMethod === 'cash' ? new Date() : null,
-      }
+        paidAt: payload.paymentMethod === "cash" ? new Date() : null,
+      },
     });
 
     // create suborders
@@ -211,8 +219,8 @@ export const createOrder = async (payload, user = null) => {
         data: {
           orderId: order.id,
           name: so.name || payload.customerName,
-          note: so.note || null
-        }
+          note: so.note || null,
+        },
       });
       createdSubs.push(sub);
     }
@@ -229,24 +237,26 @@ export const createOrder = async (payload, user = null) => {
           qty: item.qty,
           price: item.price,
           type: item.type,
-          note: item.note
-        }
+          note: item.note,
+        },
       });
 
       await tx.product.update({
         where: { id: item.productId },
         data: {
-          stock: { decrement: item.qty }
-        }
+          stock: { decrement: item.qty },
+        },
       });
     }
 
     // Payment integration (Midtrans)
     let paymentUrl = null;
     let token = null;
-    if (payload.paymentMethod === 'qris') {
+    if (payload.paymentMethod === "qris") {
       const mid = await createTransaction(order, total);
       paymentUrl = mid;
+    } else {
+      paymentUrl = `${process.env.FRONTEND_URL}/payment-success?orderCode=${order.code}`;
     }
 
     return {
@@ -256,54 +266,76 @@ export const createOrder = async (payload, user = null) => {
       paymentUrl: paymentUrl,
     };
   });
-}
+};
+
+export const getOrdersByPhone = async (phone, status) => {
+  return await prisma.order.findMany({
+    where: { customerPhone: phone, status: status },
+    include: {
+      OrderItem: {
+        include: {
+          Product: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+};
 
 export const getAllOrders = async () => {
   return await prisma.order.findMany({
     include: {
       OrderItem: {
         include: {
-          Product: true
-        }
-      }
+          Product: true,
+        },
+      },
     },
     orderBy: {
-      createdAt: 'desc'
-    }
+      createdAt: "desc",
+    },
   });
-}
+};
 
-export const getOrderById = async (id) => {
+export const getOrderByCode = async (code) => {
   return await prisma.order.findUnique({
-    where: { id: Number(id) },
+    where: { code },
     include: {
       OrderItem: {
         include: {
-          Product: true
-        }
-      }
-    }
+          Product: true,
+        },
+      },
+    },
   });
 };
 
 export const getOrderSummary = async () => {
   const orders = await prisma.order.findMany({
-    where: { status: 'paid' }
+    where: { status: "paid" },
   });
 
   const totalRevenue = orders.reduce((sum, o) => sum + o.total, 0);
 
   return {
     totalRevenue,
-    totalOrders: orders.length
+    totalOrders: orders.length,
   };
 };
 
-export const updateOrderStatus = async (code, status) => {
-  const paidAt = status === 'paid' ? new Date() : null;
-  console.log(paidAt);
+export const updatePaymentStatus = async (code, status) => {
+  const paidAt = status === "paid" ? new Date() : null;
   return await prisma.order.update({
     where: { code: code },
-    data: { status, paidAt }
+    data: { status, paidAt },
+  });
+};
+
+export const updateOrderStatus = async (code, status) => {
+  return await prisma.order.update({
+    where: { code: code },
+    data: { status },
   });
 };

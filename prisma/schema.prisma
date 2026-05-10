@@ -37,6 +37,7 @@ enum ItemType {
   matang
 }
 
+// Untuk improvement jika ada fitur auth untuk user, sekarang hanya admin saja
 model User {
   id        Int      @id @default(autoincrement())
   name      String
@@ -64,6 +65,7 @@ model Order {
   id Int @id @default(autoincrement())
   code String @unique
 
+  // Untuk improvement jika ada fitur auth untuk user, sekarang hanya admin saja
   userId Int?
   User   User? @relation(fields: [userId], references: [id])
 
