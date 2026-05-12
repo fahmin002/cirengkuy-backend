@@ -9,6 +9,7 @@ router.post("/", orderController.createOrder);
 router.get("/:code", orderController.getOrder);
 router.get("/customer/:phone", orderController.getOrdersByPhone);
 router.get("/customer/:phone/:status", orderController.getOrdersByPhone);
+router.patch("/:id/cancel", orderController.cancelOrder);
 
 // Admin
 router.get("/all", authenticate, isAdmin, orderController.getAllOrders);

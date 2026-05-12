@@ -149,6 +149,21 @@ const getOrderByQuery = async (req, res) => {
   res.json({ data: orders });
 };
 
+const cancelOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const order = await orderService.cancelOrder(id);
+    res.json({
+      message: "Pesanan dibatalkan",
+      data: order,
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: err.message,
+    });
+  }
+};
+
 export default {
   createOrder,
   getOrder,
@@ -156,4 +171,5 @@ export default {
   updateOrderStatus,
   getOrdersByPhone,
   getOrderByQuery,
+  cancelOrder,
 };

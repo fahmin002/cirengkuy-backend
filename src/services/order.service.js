@@ -1,3 +1,4 @@
+import e from "cors";
 import prisma from "../config/db.js";
 import { createTransaction } from "./midtrans.service.js";
 // export const createOrder = async (items, userId = null, paymentMethod = 'cash') => {
@@ -60,7 +61,7 @@ import { createTransaction } from "./midtrans.service.js";
 
 //   return order;
 // };
-import { v4 as uuidv4 } from "uuid";
+import { parse, v4 as uuidv4 } from "uuid";
 /* ---------------------------
  * 1. VALIDATION
  * --------------------------- */
@@ -204,6 +205,13 @@ export const createOrder = async (payload, user = null) => {
         paymentMethod: payload.paymentMethod,
         deliveryMethod: payload.deliveryMethod,
 
+        // perlu diupdate setelah payment
+        paymentUrl:
+          payload.paymentMethod === "cash"
+            ? `${process.env.FRONTEND_URL}/payment-success?orderCode=${orderCode}`
+            : null,
+        paymentExpiredAt: null,
+
         address: payload.deliveryMethod === "delivery" ? payload.address : null,
         scheduledAt: payload.scheduledAt ? new Date(payload.scheduledAt) : null,
         note: payload.note || null,
@@ -251,10 +259,18 @@ export const createOrder = async (payload, user = null) => {
 
     // Payment integration (Midtrans)
     let paymentUrl = null;
-    let token = null;
     if (payload.paymentMethod === "qris") {
       const mid = await createTransaction(order, total);
       paymentUrl = mid;
+      // Update paymentUrl and add paymentExpiredAt
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          paymentUrl: mid,
+          // 15 menit dari sekarang
+          paymentExpiredAt: new Date(Date.now() + 15 * 60 * 1000),
+        },
+      });
     } else {
       paymentUrl = `${process.env.FRONTEND_URL}/payment-success?orderCode=${order.code}`;
     }
@@ -338,4 +354,75 @@ export const updateOrderStatus = async (code, status) => {
     where: { code: code },
     data: { status },
   });
+};
+
+export const cancelOrder = async (orderId) => {
+  await prisma.$transaction(async (tx) => {
+    const order = await tx.order.findUnique({
+      where: { id: Number(orderId) },
+      include: {
+        OrderItem: true,
+      },
+    });
+
+    if (!order) {
+      throw new Error("Order tidak ditemukan");
+    }
+
+    const cancellableStatuses = ["pending", "paid"];
+
+    if (!cancellableStatuses.includes(order.status)) {
+      throw new Error("Pesanan tidak bisa dibatalkan");
+    }
+
+    // restore stock
+    for (const item of order.OrderItem) {
+      await tx.product.update({
+        where: {
+          id: item.productId,
+        },
+        data: {
+          stock: {
+            increment: item.qty,
+          },
+        },
+      });
+    }
+
+    // cancel order
+    await tx.order.update({
+      where: {
+        id: Number(orderId),
+      },
+      data: {
+        status: "cancelled",
+      },
+    });
+  });
+};
+
+export const restockOrder = async (code) => {
+  const order = await prisma.order.findUnique({
+    where: { code },
+    include: {
+      OrderItem: true,
+    },
+  });
+
+  if (!order) {
+    throw new Error("Order tidak ditemukan");
+  }
+
+  for (const item of order.OrderItem) {
+    await prisma.product.update({
+      where: {
+        id: item.productId,
+      },
+      data: {
+        stock: {
+          increment: item.qty,
+        },
+      },
+    });
+  }
 };

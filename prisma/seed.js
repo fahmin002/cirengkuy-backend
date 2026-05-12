@@ -38,31 +38,31 @@ async function main() {
   // =========================
   // 2. PRODUCTS
   // =========================
-  const products = await Promise.all([
-    prisma.product.create({
-      data: {
-        name: 'Cireng Original',
-        price: 5000,
-        stock: 100
-      }
-    }),
-    prisma.product.create({
-      data: {
-        name: 'Cireng Isi Ayam',
-        price: 8000,
-        stock: 100
-      }
-    }),
-    prisma.product.create({
-      data: {
-        name: 'Cireng Pedas Level 5',
-        price: 9000,
-        stock: 100
-      }
-    })
-  ]);
+  // const products = await Promise.all([
+  //   prisma.product.create({
+  //     data: {
+  //       name: 'Cireng Original',
+  //       price: 5000,
+  //       stock: 100
+  //     }
+  //   }),
+  //   prisma.product.create({
+  //     data: {
+  //       name: 'Cireng Isi Ayam',
+  //       price: 8000,
+  //       stock: 100
+  //     }
+  //   }),
+  //   prisma.product.create({
+  //     data: {
+  //       name: 'Cireng Pedas Level 5',
+  //       price: 9000,
+  //       stock: 100
+  //     }
+  //   })
+  // ]);
 
-  console.log('✅ Products seeded');
+  // console.log('✅ Products seeded');
 
   // =========================
   // 3. SAMPLE ORDER (CASH)
@@ -131,7 +131,7 @@ async function main() {
   //   }
   // });
 
-  console.log('✅ Sample order seeded');
+  // console.log('✅ Sample order seeded');
 
   console.log('🎉 SEEDING DONE!');
 }
