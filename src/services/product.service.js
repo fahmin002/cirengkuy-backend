@@ -19,6 +19,16 @@ export const getAllProducts = async () => {
   });
 };
 
+export const getActiveProducts = async () => {
+  const products = await prisma.product.findMany({
+    where: { isActive: true, stock: {
+      gt: 0
+    } },
+    orderBy: { createdAt: "desc" },
+  });
+  return products;
+}
+
 export const getProductById = async (id) => {
   return await prisma.product.findUnique({
     where: { id: Number(id) },

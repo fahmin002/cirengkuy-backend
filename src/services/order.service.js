@@ -1,67 +1,21 @@
 import e from "cors";
 import prisma from "../config/db.js";
 import { createTransaction } from "./midtrans.service.js";
-// export const createOrder = async (items, userId = null, paymentMethod = 'cash') => {
-//   // 1. Ambil data produk berdasarkan productId dari items
-//   const productIds = items.map(item => item.productId);
-//   const products = await prisma.product.findMany({
-//     where: { id: { in: productIds } }
-//   });
-
-//   // 2. Validasi apakah semua productId valid
-//   if (products.length !== items.length) {
-//     throw new Error('Salah satu produk tidak ditemukan');
-//   }
-
-//   // 3. Hitung total harga
-//   let total = 0;
-//   const orderItemsData = items.map(item => {
-//     const product = products.find(p => p.id === item.productId);
-//     const subTotal = product.price * item.qty;
-//     total += subTotal;
-
-//     return {
-//       productId: item.productId,
-//       qty: item.qty,
-//       price: product.price
-//     };
-//   });
-//   // 4. Buat order dan order items dalam transaksi
-//   const order = await prisma.$transaction(async (tx) => {
-//     const newOrder = await tx.order.create({
-//       data: {
-//         userId,
-//         total,
-//         status: paymentMethod === 'qris' ? 'pending' : 'paid',
-//         paymentMethod,
-//         paidAt: paymentMethod === 'qris' ? null : new Date()
-//       }
-//     });
-
-//     await tx.orderItem.createMany({
-//       data: orderItemsData.map(item => ({
-//         ...item,
-//         orderId: newOrder.id
-//       }))
-//     });
-
-//     await Promise.all(orderItemsData.map(async item => {
-//       const product = products.find(p => p.id === item.productId);
-//       if (product.stock < item.qty) {
-//         throw new Error(`Stok produk ${product.name} tidak cukup`);
-//       }
-//       await tx.product.update({
-//         where: { id: item.productId },
-//         data: { stock: product.stock - item.qty }
-//       });
-//     }));
-
-//     return newOrder;
-//   });
-
-//   return order;
-// };
 import { parse, v4 as uuidv4 } from "uuid";
+import { io } from "../../index.js";
+
+const notifyOrderToAdmin = (order) => {
+  io.to("admin-room").emit(
+    "new-order",
+    {
+      code: order.code,
+      customerName: order.customerName,
+      total: order.total,
+      status: order.status,
+    }
+  );
+}
+
 /* ---------------------------
  * 1. VALIDATION
  * --------------------------- */
@@ -179,14 +133,7 @@ async function prepareOrderData(tx, subOrders) {
 /* ---------------------------
  * 4. MAIN EXECUTION
  * --------------------------- */
-export const createOrder = async (payload, user = null) => {
-  // Inject data dari user (kalau login)
-  if (user) {
-    payload.userId = user.id;
-    payload.customerName = user.name;
-    payload.customerPhone = user.phone;
-  }
-
+export const createOrder = async (payload) => {
   validatePayload(payload);
 
   const subOrders = normalizePayload(payload);
@@ -196,7 +143,6 @@ export const createOrder = async (payload, user = null) => {
     const orderCode = uuidv4();
     const order = await tx.order.create({
       data: {
-        userId: payload.userId || null,
         customerName: payload.customerName,
         customerPhone: payload.customerPhone || null,
         code: orderCode,
@@ -275,6 +221,8 @@ export const createOrder = async (payload, user = null) => {
       paymentUrl = `${process.env.FRONTEND_URL}/payment-success?orderCode=${order.code}`;
     }
 
+    notifyOrderToAdmin(order);
+
     return {
       orderId: order.id,
       total,
@@ -284,9 +232,16 @@ export const createOrder = async (payload, user = null) => {
   });
 };
 
-export const getOrdersByPhone = async (phone, status) => {
-  return await prisma.order.findMany({
-    where: { customerPhone: phone, status: status },
+export const getOrdersByPhone = async (phone, status, limit, skip) => {
+  const where = {
+      customerPhone: phone,
+      ...(status
+        ? { status }
+        : {}
+      ),
+  }
+  const orders = await prisma.order.findMany({
+    where,
     include: {
       OrderItem: {
         include: {
@@ -297,7 +252,15 @@ export const getOrdersByPhone = async (phone, status) => {
     orderBy: {
       createdAt: "desc",
     },
+    take: limit,
+    skip: skip
   });
+
+  const total = await prisma.order.count({
+    where
+  });
+
+  return { orders, total }
 };
 
 export const getAllOrders = async () => {
@@ -350,6 +313,10 @@ export const updatePaymentStatus = async (code, status) => {
 };
 
 export const updateOrderStatus = async (code, status) => {
+  io.to(`order-${code}`)
+    .emit("order-status-updated", {
+      status: status,
+    });
   return await prisma.order.update({
     where: { code: code },
     data: { status },
@@ -426,3 +393,81 @@ export const restockOrder = async (code) => {
     });
   }
 };
+
+export const getStats = async () => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const revenueToday = await prisma.order.aggregate({
+    _sum: {
+      total: true,
+    },
+    where: {
+      createdAt: {
+        gte: today,
+      },
+      status: {
+        not: "cancelled",
+      },
+    },
+  });
+
+  const totalOrdersToday = await prisma.order.count({
+    where: {
+      createdAt: {
+        gte: today,
+      },
+      status: {
+        not: "cancelled",
+      },
+    },
+  });
+
+  const pendingOrders = await prisma.order.count({
+    where: {
+      status: {
+        in: ["pending", "paid", "cooking"],
+      },
+    },
+  });
+
+  const itemSold = await prisma.orderItem.aggregate({
+    _sum: {
+      qty: true,
+    },
+    where: {
+      Order: {
+        createdAt: {
+          gte: today,
+        },
+        status: {
+          not: "cancelled",
+        },
+      },
+    },
+  });
+
+  return {
+    revenueToday: revenueToday._sum.total || 0,
+    totalOrdersToday,
+    pendingOrders,
+    itemSold: itemSold._sum.qty || 0,
+  };
+}
+
+export const getRecentOrders = async (limit = 5) => {
+  const recentOrders = await prisma.order.findMany({
+    take: limit,
+    orderBy: {
+      createdAt: "desc",
+    },
+    select: {
+      id: true,
+      customerName: true,
+      total: true,
+      status: true,
+      createdAt: true,
+    },
+  });
+  return recentOrders;
+}

@@ -58,11 +58,28 @@ const getAllOrders = async (req, res) => {
 
 const getOrdersByPhone = async (req, res) => {
   try {
-    const { phone, status } = req.params;
-    const orders = await orderService.getOrdersByPhone(phone, status);
+    const { phone } = req.params;
+    const { status } = req.query;
+    const page = Number(req.query.page) || 1;
+
+    const limit =
+      Number(req.query.limit) || 5;
+
+    const skip = (page - 1) * limit;
+    const { orders, total } = await orderService.getOrdersByPhone(phone, status, limit, skip);
 
     res.json({
       data: orders,
+
+      pagination: {
+        page,
+        limit,
+        total,
+
+        totalPages: Math.ceil(
+          total / limit
+        ),
+      },
       success: true,
     });
   } catch (err) {
@@ -72,6 +89,24 @@ const getOrdersByPhone = async (req, res) => {
     });
   }
 };
+
+// const getOrdersByPhone = async (req, res) => {
+//   try {
+//     const { phone, status } = req.params;
+//     const
+//     const orders = await orderService.getOrdersByPhone(phone, status);
+
+//     res.json({
+//       data: orders,
+//       success: true,
+//     });
+//   } catch (err) {
+//     res.status(500).json({
+//       success: false,
+//       error: err.message,
+//     });
+//   }
+// };
 
 const updateOrderStatus = async (req, res) => {
   try {
@@ -122,18 +157,50 @@ const updateOrderStatus = async (req, res) => {
   }
 };
 
+// const getOrderByQuery = async (req, res) => {
+//   const { status, q } = req.query;
+
+//   const where = {
+//     ...(status ? { status } : {}),
+//     ...(q
+//       ? {
+//         OR: [
+//           { customerName: { contains: q, mode: "insensitive" } },
+//           { customerPhone: { contains: q, mode: "insensitive" } },
+//         ],
+//       }
+//       : {}),
+//   };
+
+//   const orders = await prisma.order.findMany({
+//     where,
+//     include: {
+//       OrderItem: { include: { Product: true } },
+//     },
+//     orderBy: { createdAt: "desc" },
+//     take: 50,
+//   });
+
+//   res.json({ data: orders });
+// };
+
 const getOrderByQuery = async (req, res) => {
   const { status, q } = req.query;
+  const page = Number(req.query.page) || 1;
 
+  const limit =
+    Number(req.query.limit) || 10;
+
+  const skip = (page - 1) * limit;
   const where = {
     ...(status ? { status } : {}),
     ...(q
       ? {
-          OR: [
-            { customerName: { contains: q, mode: "insensitive" } },
-            { customerPhone: { contains: q, mode: "insensitive" } },
-          ],
-        }
+        OR: [
+          { customerName: { contains: q, mode: "insensitive" } },
+          { customerPhone: { contains: q, mode: "insensitive" } },
+        ],
+      }
       : {}),
   };
 
@@ -143,10 +210,23 @@ const getOrderByQuery = async (req, res) => {
       OrderItem: { include: { Product: true } },
     },
     orderBy: { createdAt: "desc" },
-    take: 50,
+    take: limit,
+    skip
   });
 
-  res.json({ data: orders });
+  const total = await prisma.order.count({ where });
+  res.json({
+    data: orders,
+    pagination: {
+      total,
+      page,
+      limit,
+
+      totalPages: Math.ceil(
+        total / limit
+      ),
+    },
+  });
 };
 
 const cancelOrder = async (req, res) => {
@@ -164,6 +244,36 @@ const cancelOrder = async (req, res) => {
   }
 };
 
+const getStats = async (req, res) => {
+  try {
+    const stats = await orderService.getStats();
+    res.json({
+      data: stats,
+      success: true,
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: err.message,
+      success: false,
+    });
+  }
+}
+
+export const getRecentOrders = async (req, res) => {
+  try {
+    const orders = await orderService.getRecentOrders();
+    res.json({
+      data: orders,
+      success: true,
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: err.message,
+      success: false,
+    });
+  }
+}
+
 export default {
   createOrder,
   getOrder,
@@ -172,4 +282,6 @@ export default {
   getOrdersByPhone,
   getOrderByQuery,
   cancelOrder,
+  getStats,
+  getRecentOrders,
 };

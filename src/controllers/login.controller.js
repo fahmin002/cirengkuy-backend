@@ -1,35 +1,72 @@
-import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
-import prisma from '../config/db.js';
+import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
+import prisma from "../config/db.js";
 
 const login = async (req, res) => {
-    const { email, password } = req.body;
-
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user || !user.password) {
-        return res.status(401).json({ message: 'User tidak ditemukan' });
-    }
-
-    const valid = await bcrypt.compare(password, user.password);
-
-    if (!valid) {
-        return res.status(401).json({ message: 'Password salah' });
-    }
-
-    const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1d' });
-
-    res.json({
-        data: {
-            token,
-            user: {
-                id: user.id,
-                name: user.name,
-                role: user.role,
-            }
-        }
+  try {
+    const { username, password } = req.body;
+    // cari admin
+    const admin = await prisma.admin.findFirst({
+      where: {
+        username,
+      },
     });
-}
+
+    if (!admin) {
+      return res.status(401).json({
+        success: false,
+        message: "Admin tidak ditemukan",
+      });
+    }
+
+    // compare password
+    const validPassword = await bcrypt.compare(
+      password,
+      admin.password
+    );
+
+    if (!validPassword) {
+      return res.status(401).json({
+        success: false,
+        message: "Password salah",
+      });
+    }
+
+    // generate token
+    const token = jwt.sign(
+      {
+        adminId: admin.id,
+        username: admin.username,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "1d",
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Login berhasil",
+
+      data: {
+        token,
+
+        admin: {
+          id: admin.id,
+          username: admin.username,
+        },
+      },
+    });
+  } catch (err) {
+    console.error(err);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
 
 export default {
-    login
+  login,
 };
