@@ -11,7 +11,7 @@ import productRoutes from "./src/routes/product.routes.js";
 import orderRoutes from "./src/routes/order.routes.js";
 import paymentRoutes from "./src/routes/payment.routes.js";
 import loginRoutes from "./src/routes/login.routes.js";
-// import adminRoutes from './src/routes/admin.routes.js';
+import reportRoutes from "./src/routes/report.routes.js";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -34,6 +34,7 @@ app.get("/", (req, res) => {
 
 // ── Routes ──
 app.use("/api/products", productRoutes);
+app.use("/api/reports", reportRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/auth/login", loginRoutes);
@@ -50,6 +51,5 @@ app.use((err, req, res, next) => {
 // app.listen(PORT, "0.0.0.0", () => {
 //   console.log(`🚀 CirengKuy API jalan di http://localhost:${PORT}`);
 // });
-
 
 export default app;

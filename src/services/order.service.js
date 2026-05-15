@@ -5,16 +5,14 @@ import { parse, v4 as uuidv4 } from "uuid";
 import { io } from "../../index.js";
 
 const notifyOrderToAdmin = (order) => {
-  io.to("admin-room").emit(
-    "new-order",
-    {
-      code: order.code,
-      customerName: order.customerName,
-      total: order.total,
-      status: order.status,
-    }
-  );
-}
+  io.to("admin-room").emit("new-order", {
+    id: order.id,
+    code: order.code,
+    customerName: order.customerName,
+    total: order.total,
+    status: order.status,
+  });
+};
 
 /* ---------------------------
  * 1. VALIDATION
@@ -234,12 +232,9 @@ export const createOrder = async (payload) => {
 
 export const getOrdersByPhone = async (phone, status, limit, skip) => {
   const where = {
-      customerPhone: phone,
-      ...(status
-        ? { status }
-        : {}
-      ),
-  }
+    customerPhone: phone,
+    ...(status ? { status } : {}),
+  };
   const orders = await prisma.order.findMany({
     where,
     include: {
@@ -253,14 +248,14 @@ export const getOrdersByPhone = async (phone, status, limit, skip) => {
       createdAt: "desc",
     },
     take: limit,
-    skip: skip
+    skip: skip,
   });
 
   const total = await prisma.order.count({
-    where
+    where,
   });
 
-  return { orders, total }
+  return { orders, total };
 };
 
 export const getAllOrders = async () => {
@@ -313,10 +308,9 @@ export const updatePaymentStatus = async (code, status) => {
 };
 
 export const updateOrderStatus = async (code, status) => {
-  io.to(`order-${code}`)
-    .emit("order-status-updated", {
-      status: status,
-    });
+  io.to(`order-${code}`).emit("order-status-updated", {
+    status: status,
+  });
   return await prisma.order.update({
     where: { code: code },
     data: { status },
@@ -398,6 +392,7 @@ export const getStats = async () => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  const revenueStatuses = ["paid", "cooking", "ready", "completed"];
   const revenueToday = await prisma.order.aggregate({
     _sum: {
       total: true,
@@ -407,7 +402,7 @@ export const getStats = async () => {
         gte: today,
       },
       status: {
-        not: "cancelled",
+        in: revenueStatuses,
       },
     },
   });
@@ -418,15 +413,15 @@ export const getStats = async () => {
         gte: today,
       },
       status: {
-        not: "cancelled",
+        in: revenueStatuses,
       },
     },
   });
 
-  const pendingOrders = await prisma.order.count({
+  const activeOrders = await prisma.order.count({
     where: {
       status: {
-        in: ["pending", "paid", "cooking"],
+        in: ["pending", "paid", "cooking", "ready"],
       },
     },
   });
@@ -441,7 +436,7 @@ export const getStats = async () => {
           gte: today,
         },
         status: {
-          not: "cancelled",
+          in: revenueStatuses,
         },
       },
     },
@@ -450,10 +445,10 @@ export const getStats = async () => {
   return {
     revenueToday: revenueToday._sum.total || 0,
     totalOrdersToday,
-    pendingOrders,
+    activeOrders,
     itemSold: itemSold._sum.qty || 0,
   };
-}
+};
 
 export const getRecentOrders = async (limit = 5) => {
   const recentOrders = await prisma.order.findMany({
@@ -470,4 +465,4 @@ export const getRecentOrders = async (limit = 5) => {
     },
   });
   return recentOrders;
-}
+};

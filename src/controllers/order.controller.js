@@ -185,7 +185,7 @@ const updateOrderStatus = async (req, res) => {
 // };
 
 const getOrderByQuery = async (req, res) => {
-  const { status, q } = req.query;
+  const { status, search } = req.query;
   const page = Number(req.query.page) || 1;
 
   const limit =
@@ -194,18 +194,28 @@ const getOrderByQuery = async (req, res) => {
   const skip = (page - 1) * limit;
   const where = {
     ...(status ? { status } : {}),
-    ...(q
+    ...(search
       ? {
         OR: [
-          { customerName: { contains: q, mode: "insensitive" } },
-          { customerPhone: { contains: q, mode: "insensitive" } },
+          { customerName: { contains: search } },
+          { customerPhone: { contains: search } },
         ],
       }
       : {}),
   };
 
   const orders = await prisma.order.findMany({
-    where,
+    where: {
+      ...(status ? { status } : {}),
+      ...(search
+        ? {
+          OR: [
+            { customerName: { contains: search } },
+            { customerPhone: { contains: search } },
+          ],
+        }
+        : {}),
+    },
     include: {
       OrderItem: { include: { Product: true } },
     },

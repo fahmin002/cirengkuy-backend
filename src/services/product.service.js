@@ -42,6 +42,7 @@ export const updateProduct = async (id, data) => {
       name: data.name,
       price: Number(data.price),
       isActive: data.isActive,
+      stock: Number(data.stock),
       imageUrl: data.imageUrl || null,
     },
   });
